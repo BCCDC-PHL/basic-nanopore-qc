@@ -1,0 +1,8 @@
+name: basic-nanopore-qc
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3
+  - nanoq=0.10.0
