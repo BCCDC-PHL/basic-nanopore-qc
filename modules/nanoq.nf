@@ -1,8 +1,6 @@
 process nanoq {
 
     tag { sample_id }
-    
-    publishDir "${params.outdir}/${sample_id}", pattern: "${sample_id}_nanoq.csv", mode: 'copy'
 
     input:
     tuple val(sample_id), path(reads)
