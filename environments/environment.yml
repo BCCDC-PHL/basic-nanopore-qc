@@ -6,3 +6,4 @@ channels:
 dependencies:
   - python=3
   - nanoq=0.10.0
+  - fastplong=0.6.0
