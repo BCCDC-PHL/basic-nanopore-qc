@@ -3,16 +3,10 @@
 nextflow.enable.dsl = 2
 
 include { hash_files }           from './modules/hash_files.nf'
+include { fastplong }            from './modules/fastplong.nf'
 include { nanoq }                from './modules/nanoq.nf'
-include { fastplong } from './modules/fastplong.nf'
 include { pipeline_provenance }  from './modules/provenance.nf'
 include { collect_provenance }   from './modules/provenance.nf'
-
-
-
-if (!(params.tool in ['fastplong', 'nanoq'])) {
-  exit 1, "ERROR: unrecognized --tool '${params.tool}'. Valid options are: fastplong, nanoq"
-}
 
 
 workflow {
@@ -33,18 +27,17 @@ workflow {
 
   main:
     hash_files(ch_fastq.combine(Channel.of("fastq-input")))
-    
+
     if (params.tool == 'fastplong') {
-      fastplong(ch_fastq)
-      ch_qc_csv = fastplong.out.csv.map{ it -> it[1] }
+      ch_qc = fastplong(ch_fastq)
+    } else if (params.tool == 'nanoq') {
+      ch_qc = nanoq(ch_fastq)
     } else {
-      nanoq(ch_fastq)
-      ch_qc_csv = nanoq.out
+      error "ERROR: unrecognized --tool '${params.tool}'. Valid options are: fastplong, nanoq"
     }
 
     output_prefix = params.prefix == '' ? params.prefix : params.prefix + '_'
-    
-    nanoq.out.csv.map{ it -> it[1] }.collectFile(keepHeader: true, sort: { it.text }, name: "${output_prefix}basic_qc_stats.csv", storeDir: "${params.outdir}")
+    ch_qc.csv.map{ it -> it[1] }.collectFile(keepHeader: true, sort: { it.text }, name: "${output_prefix}basic_qc_stats.csv", storeDir: "${params.outdir}")
 
     // Collect Provenance
     // The basic idea is to build up a channel with the following structure:
@@ -55,10 +48,7 @@ workflow {
     ch_provenance = ch_fastq.map{ it -> it[0] }
     ch_provenance = ch_provenance.combine(ch_pipeline_provenance).map{ it -> [it[0], [it[1]]] }
     ch_provenance = ch_provenance.join(hash_files.out.provenance).map{ it -> [it[0], it[1] << it[2]] }
-    ch_provenance = ch_provenance.join(nanoq.out.provenance).map{ it -> [it[0], it[1] << it[2]] }
-
-    output_prefix = params.prefix == '' ? params.prefix : params.prefix + '_'
-    ch_qc_csv.collectFile(keepHeader: true, sort: { it.text }, name: "${output_prefix}basic_qc_stats.csv", storeDir: "${params.outdir}")
+    ch_provenance = ch_provenance.join(ch_qc.provenance).map{ it -> [it[0], it[1] << it[2]] }
 
     collect_provenance(ch_provenance)
 }

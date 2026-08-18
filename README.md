@@ -96,6 +96,23 @@ In the output directory for each sample, a provenance file will be written with 
 - input_filename: sample-01_barcode01_RL.fastq.gz
   input_path: /path/to/sample-01_barcode01_RL.fastq.gz
   sha256: 2793587aeb2b87bece4902183c295213a7943ea178c83f8b5432594d4b2e3b84
+- process_name: fastplong
+  tools:
+    - tool_name: fastplong
+      tool_version: 0.6.0
+      parameters:
+        - parameter: --disable_adapter_trimming
+          value: null
+        - parameter: --disable_quality_filtering
+          value: null
+        - parameter: --disable_length_filtering
+          value: null
+```
+
+The final block records whichever tool was selected by `--tool`. Under
+`--tool nanoq` it is:
+
+```yml
 - process_name: nanoq
   tools:
     - tool_name: nanoq
