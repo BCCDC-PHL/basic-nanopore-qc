@@ -39,12 +39,14 @@ workflow {
     output_prefix = params.prefix == '' ? params.prefix : params.prefix + '_'
     ch_qc.csv.map{ it -> it[1] }.collectFile(keepHeader: true, sort: { it.text }, name: "${output_prefix}basic_qc_stats.csv", storeDir: "${params.outdir}")
 
-    // Collect Provenance
-    // The basic idea is to build up a channel with the following structure:
-    // [sample_id, [provenance_file_1.yml, provenance_file_2.yml, provenance_file_3.yml...]]
-    // At each step, we add another provenance file to the list using the << operator...
-    // ...and then concatenate them all together in the 'collect_provenance' process.
+    // Pipeline Provenance
+
     ch_pipeline_provenance = pipeline_provenance(ch_workflow_metadata)
+
+    // Per-process Provenance
+    // We build up a channel with the following structure:
+    // [sample_id, [provenance_file_1.yml, provenance_file_2.yml, provenance_file_3.yml...]]
+
     ch_provenance = ch_fastq.map{ it -> it[0] }
     ch_provenance = ch_provenance.combine(ch_pipeline_provenance).map{ it -> [it[0], [it[1]]] }
     ch_provenance = ch_provenance.join(hash_files.out.provenance).map{ it -> [it[0], it[1] << it[2]] }
