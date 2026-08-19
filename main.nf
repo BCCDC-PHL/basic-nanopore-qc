@@ -2,11 +2,15 @@
 
 nextflow.enable.dsl = 2
 
-include { hash_files }           from './modules/hash_files.nf'
-include { fastplong }            from './modules/fastplong.nf'
-include { nanoq }                from './modules/nanoq.nf'
-include { pipeline_provenance }  from './modules/provenance.nf'
-include { collect_provenance }   from './modules/provenance.nf'
+include { hash_files as hash_fastq_input }  from './modules/hash_files.nf'
+include { hash_files as hash_fastq_output } from './modules/hash_files.nf'
+include { fastplong }                       from './modules/fastplong.nf'
+include { nanoq_stats as nanoq_before }     from './modules/nanoq.nf'
+include { nanoq_stats as nanoq_after }      from './modules/nanoq.nf'
+include { filter_nanoq }                    from './modules/nanoq.nf'
+include { merge_nanoq_reports }             from './modules/nanoq.nf'
+include { pipeline_provenance }             from './modules/provenance.nf'
+include { collect_provenance }              from './modules/provenance.nf'
 
 
 workflow {
@@ -26,18 +30,36 @@ workflow {
   }
 
   main:
-    hash_files(ch_fastq.combine(Channel.of("fastq-input")))
+    hash_fastq_input(ch_fastq.combine(Channel.of("fastq-input")))
 
+    // Each branch emits the same three channel shapes: the stats csv, the
+    // filtered reads, and its provenance as a list of one file per process.
+    // fastplong reports both sides of filtering from a single pass; nanoq
+    // reports on whatever it emits, so it needs a stats pass either side.
     if (params.tool == 'fastplong') {
-      ch_qc = fastplong(ch_fastq)
+      fastplong(ch_fastq)
+
+      ch_qc_csv        = fastplong.out.csv
+      ch_filtered      = fastplong.out.filtered_reads
+      ch_qc_provenance = fastplong.out.provenance.map{ it -> [it[0], [it[1]]] }
     } else if (params.tool == 'nanoq') {
-      ch_qc = nanoq(ch_fastq)
+      nanoq_before(ch_fastq.combine(Channel.of("prefilter")))
+      filter_nanoq(ch_fastq)
+      nanoq_after(filter_nanoq.out.filtered_reads.combine(Channel.of("postfilter")))
+      merge_nanoq_reports(nanoq_before.out.report.map{ it -> [it[0], it[2]] }.join(nanoq_after.out.report.map{ it -> [it[0], it[2]] }))
+
+      ch_qc_csv        = merge_nanoq_reports.out
+      ch_filtered      = filter_nanoq.out.filtered_reads
+      ch_qc_provenance = nanoq_before.out.provenance.join(filter_nanoq.out.provenance).join(nanoq_after.out.provenance).map{ it -> [it[0], [it[1], it[2], it[3]]] }
     } else {
       error "ERROR: unrecognized --tool '${params.tool}'. Valid options are: fastplong, nanoq"
     }
 
+    // The hash records what the pipeline produced, whether or not it is published.
+    hash_fastq_output(ch_filtered.combine(Channel.of("fastq-output")))
+
     output_prefix = params.prefix == '' ? params.prefix : params.prefix + '_'
-    ch_qc.csv.map{ it -> it[1] }.collectFile(keepHeader: true, sort: { it.text }, name: "${output_prefix}basic_qc_stats.csv", storeDir: "${params.outdir}")
+    ch_qc_csv.map{ it -> it[1] }.collectFile(keepHeader: true, sort: { it.text }, name: "${output_prefix}basic_qc_stats.csv", storeDir: "${params.outdir}")
 
     // Pipeline Provenance
 
@@ -49,8 +71,9 @@ workflow {
 
     ch_provenance = ch_fastq.map{ it -> it[0] }
     ch_provenance = ch_provenance.combine(ch_pipeline_provenance).map{ it -> [it[0], [it[1]]] }
-    ch_provenance = ch_provenance.join(hash_files.out.provenance).map{ it -> [it[0], it[1] << it[2]] }
-    ch_provenance = ch_provenance.join(ch_qc.provenance).map{ it -> [it[0], it[1] << it[2]] }
+    ch_provenance = ch_provenance.join(hash_fastq_input.out.provenance).map{ it -> [it[0], it[1] << it[2]] }
+    ch_provenance = ch_provenance.join(ch_qc_provenance).map{ it -> [it[0], it[1] + it[2]] }
+    ch_provenance = ch_provenance.join(hash_fastq_output.out.provenance).map{ it -> [it[0], it[1] << it[2]] }
 
     collect_provenance(ch_provenance)
 }
