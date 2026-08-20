@@ -7,3 +7,4 @@ dependencies:
   - python=3
   - nanoq=0.10.0
   - fastplong=0.6.0
+  - hostile=2.0.1

@@ -2,8 +2,9 @@
 
 A generic pipeline that can be run on an arbitrary set of Oxford Nanopore sequence files, regardless of the project or organism of interest.
 
-Reads are filtered by length and mean quality, and sequence statistics are collected before and
-after filtering. The filtered reads can be published for use as input to another pipeline.
+Reads are filtered by length and mean quality, optionally dehosted, and sequence statistics
+are collected before and after. The output reads can be published for use as input to another
+pipeline.
 
 ```mermaid
 flowchart TD
@@ -48,7 +49,10 @@ first underscore.
 | `--min_length` | `200` | Discard reads shorter than this |
 | `--min_mean_quality` | `10` | Discard reads with mean base quality below this |
 | `--max_length` | `0` | Discard reads longer than this. `0` disables |
-| `--publish_filtered_reads` | off | Write the filtered reads to the output directory |
+| `--publish_filtered_reads` | off | Write the output reads to the output directory |
+| `--dehost` | off | Remove host reads with `hostile` after filtering |
+| `--dehosting_index` | `human-t2t-hla` | `hostile` index name |
+| `--hostile_cache_dir` | `/data/ref_databases/hostile` | Where `hostile` keeps its indexes |
 
 > **Choose `--min_length` to suit your target.** The default of 200 is deliberately
 > permissive. A length floor set above the shortest sequence of interest will remove it
@@ -59,6 +63,21 @@ first underscore.
 The filtered reads are only written to the output directory when `--publish_filtered_reads` is
 set. They are always produced and hashed into the provenance record either way, so the
 provenance describes what the pipeline computed rather than what it copied out.
+
+### Dehosting
+
+`--dehost` runs [`hostile`](https://github.com/bede/hostile) on the filtered reads. Passing a
+single fastq selects hostile's long-read mode, which aligns with minimap2 and builds the
+`.mmi` index from the named `--dehosting_index` on first use.
+
+The output columns do not change. `*_before_filtering` still describes the raw input and
+`*_after_filtering` describes the reads the pipeline publishes, which become the dehosted
+reads rather than the filtered ones. Downstream consumers therefore read the same csv
+either way, and `--publish_filtered_reads` writes `<sample_id>_RL.dehosted.fastq.gz` in
+place of `<sample_id>_RL.filtered.fastq.gz` — one output fastq per sample in both cases.
+
+Keeping the before-columns on the raw input means a heavily host-contaminated library still
+reports its full input yield, and only the after-columns show how little usable data it has.
 
 ### SampleSheet Input
 
@@ -108,6 +127,11 @@ outdir
 If a prefix is provided using the `--prefix` flag, it is prepended to the collected filename,
 for example `prefix_basic_qc_stats.csv`. Under `--tool nanoq` the per-sample report is a single
 `sample-01_nanoq.csv`; nanoq produces no html or json report.
+
+Under `--dehost` each sample directory also holds `sample-01_hostile.log.json`, and the
+published reads are named `sample-01_RL.dehosted.fastq.gz`. With `--tool fastplong` there is
+an additional `sample-01_post-dehosting_fastplong.{csv,json,html}`, from the second pass that
+measures the dehosted reads.
 
 Each statistic is reported before and after filtering:
 
