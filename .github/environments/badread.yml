@@ -1,0 +1,7 @@
+name: badread
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3
+  - badread=0.4.1
