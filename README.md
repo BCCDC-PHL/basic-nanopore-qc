@@ -40,6 +40,14 @@ Long-read fastq files are discovered by the `_RL` or `_L` filename suffix, for e
 `<library_id>_<barcode>_RL.fastq.gz`. The sample ID is taken from the filename up to the
 first underscore.
 
+### Execution profiles
+
+`-profile conda` builds the environment from `environments/environment.yml`. `-profile
+apptainer` and `-profile docker` use prebuilt images from GHCR instead. The image tags
+are content hashes of the conda environment, produced by the
+`build_and_push_containers.yml` workflow when a `v*` tag is pushed; update
+`nextflow.config` with the tags that workflow reports.
+
 ### Filtering parameters
 
 | Param | Default | Description |
