@@ -45,7 +45,7 @@ workflow {
       ch_filtered         = fastplong.out.filtered_reads
       ch_filter_provenance = fastplong.out.provenance.map{ it -> [it[0], [it[1]]] }
     } else if (params.tool == 'nanoq') {
-      nanoq_before(ch_fastq.combine(Channel.of("before_filtering")))
+      nanoq_before(ch_fastq.combine(Channel.of("prefilter")))
       filter_nanoq(ch_fastq)
 
       ch_filtered         = filter_nanoq.out.filtered_reads
