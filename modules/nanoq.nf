@@ -27,7 +27,7 @@ process filter_nanoq {
 
     tag { sample_id }
 
-    publishDir "${params.outdir}/${sample_id}", pattern: "${sample_id}_RL.filtered.fastq.gz", mode: 'copy', enabled: params.publish_filtered_reads
+    publishDir "${params.outdir}/${sample_id}", pattern: "${sample_id}_RL.filtered.fastq.gz", mode: 'copy', enabled: params.publish_filtered_reads && !params.dehost
 
     input:
     tuple val(sample_id), path(reads)
